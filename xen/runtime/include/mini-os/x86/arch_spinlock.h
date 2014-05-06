@@ -17,7 +17,7 @@
  */
 
 #define arch_spin_is_locked(x)	(*(volatile signed char *)(&(x)->slock) <= 0)
-#define spin_unlock_wait(x)	do { barrier(); } while(spin_is_locked(x))
+#define arch_spin_unlock_wait(x) do { barrier(); } while(spin_is_locked(x))
 
 #define spin_lock_string \
         "1:\n" \
@@ -61,7 +61,7 @@
 
 static inline void _raw_spin_unlock(spinlock_t *lock)
 {
-	char oldval = 1;
+	char oldval = ARCH_SPIN_LOCK_UNLOCKED;
 	__asm__ __volatile__(
 		spin_unlock_string
 	);

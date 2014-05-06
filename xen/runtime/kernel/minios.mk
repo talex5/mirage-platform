@@ -6,7 +6,7 @@ debug = y
 
 # Define some default flags.
 # NB. '-Wcast-qual' is nasty, so I omitted it.
-DEF_CFLAGS += -fno-builtin -Wall -Werror -Wredundant-decls -Wno-format -Wno-redundant-decls -Wno-strict-overflow
+DEF_CFLAGS += -fno-builtin -Wall -Werror -Wredundant-decls -Wno-format -Wno-redundant-decls
 DEF_CFLAGS += $(call cc-option,$(CC),-fno-stack-protector,)
 DEF_CFLAGS += $(call cc-option,$(CC),-fgnu89-inline)
 DEF_CFLAGS += -Wstrict-prototypes -Wnested-externs -Wpointer-arith -Winline
@@ -20,8 +20,8 @@ DEF_CFLAGS += -g
 #DEF_CFLAGS += -DMM_DEBUG
 #DEF_CFLAGS += -DFS_DEBUG
 #DEF_CFLAGS += -DLIBC_DEBUG
-DEF_CFLAGS += -DGNT_DEBUG
-DEF_CFLAGS += -DGNTMAP_DEBUG
+#DEF_CFLAGS += -DGNT_DEBUG
+#DEF_CFLAGS += -DGNTMAP_DEBUG
 else
 DEF_CFLAGS += -O3
 endif
@@ -39,8 +39,8 @@ LDFLAGS := $(DEF_LDFLAGS) $(ARCH_LDFLAGS)
 
 # Special build dependencies.
 # Rebuild all after touching this/these file(s)
-EXTRA_DEPS = $(MINI-OS_ROOT)/minios.mk \
-		$(MINI-OS_ROOT)/$(TARGET_ARCH_DIR)/arch.mk
+EXTRA_DEPS += $(MINI-OS_ROOT)/minios.mk
+EXTRA_DEPS += $(MINI-OS_ROOT)/$(TARGET_ARCH_DIR)/arch.mk
 
 # Find all header files for checking dependencies.
 HDRS := $(wildcard $(MINI-OS_ROOT)/include/*.h)

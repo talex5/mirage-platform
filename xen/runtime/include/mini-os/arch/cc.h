@@ -10,7 +10,8 @@
 #define __LWIP_ARCH_CC_H__
 
 /*   Typedefs for the types used by lwip - */
-#include <mini-os/x86/os.h>
+#include <mini-os/os.h>
+#include <mini-os/types.h>
 #include <time.h>
 typedef uint8_t  u8_t;
 typedef int8_t   s8_t;
@@ -53,9 +54,13 @@ extern void lwip_die(char *fmt, ...);
 #include <errno.h>
 
 /*   Not required by the docs, but needed for network-order calculations */
-#include <endian.h>
+#ifdef HAVE_LIBC
+#include <machine/endian.h>
 #ifndef BIG_ENDIAN
 #error endian.h does not define byte order
+#endif
+#else
+#include <endian.h>
 #endif
 
 #include <inttypes.h>

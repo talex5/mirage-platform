@@ -6,8 +6,14 @@
 typedef unsigned long xenbus_transaction_t;
 #define XBT_NIL ((xenbus_transaction_t)0)
 
+#ifdef CONFIG_XENBUS
 /* Initialize the XenBus system. */
 void init_xenbus(void);
+#else
+static inline void init_xenbus(void)
+{
+}
+#endif
 
 /* Read the value associated with a path.  Returns a malloc'd error
    string on failure and sets *value to NULL.  On success, *value is
@@ -89,6 +95,10 @@ char *xenbus_transaction_end(xenbus_transaction_t, int abort,
 /* Read path and parse it as an integer.  Returns -1 on error. */
 int xenbus_read_integer(const char *path);
 
+/* Read path and parse it as 16 byte uuid. Returns 1 if
+ * read and parsing were successful, 0 if not */
+int xenbus_read_uuid(const char* path, unsigned char uuid[16]);
+
 /* Contraction of snprintf and xenbus_write(path/node). */
 char* xenbus_printf(xenbus_transaction_t xbt,
                                   const char* node, const char* path,
@@ -98,7 +108,13 @@ char* xenbus_printf(xenbus_transaction_t xbt,
 /* Utility function to figure out our domain id */
 domid_t xenbus_get_self_id(void);
 
+#ifdef CONFIG_XENBUS
 /* Reset the XenBus system. */
 void fini_xenbus(void);
+#else
+static inline void fini_xenbus(void)
+{
+}
+#endif
 
 #endif /* XENBUS_H__ */

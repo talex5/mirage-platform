@@ -27,7 +27,6 @@
  * DEALINGS IN THE SOFTWARE.
  */
 
-#include <mini-os/x86/os.h>
 #include <mini-os/hypervisor.h>
 #include <mini-os/mm.h>
 #include <mini-os/events.h>
@@ -36,14 +35,16 @@
 #include <mini-os/lib.h>
 #include <mini-os/sched.h>
 #include <mini-os/xenbus.h>
+#include <mini-os/gnttab.h>
+#include <mini-os/netfront.h>
+#include <mini-os/blkfront.h>
+#include <mini-os/fbfront.h>
+#include <mini-os/pcifront.h>
 #include <mini-os/xmalloc.h>
 #include <fcntl.h>
 #include <xen/features.h>
 #include <xen/version.h>
-#include <log.h>
 
-int app_main(start_info_t *);
-void do_exit(void);
 uint8_t xen_features[XENFEAT_NR_SUBMAPS * 32];
 
 void setup_xen_features(void)
@@ -56,46 +57,85 @@ void setup_xen_features(void)
         fi.submap_idx = i;
         if (HYPERVISOR_xen_version(XENVER_get_features, &fi) < 0)
             break;
-        
+
         for (j=0; j<32; j++)
             xen_features[i*32+j] = !!(fi.submap & 1<<j);
     }
 }
 
-/*
- * INITIAL C ENTRY POINT.
- */
-void start_kernel(start_info_t *si)
+#ifdef CONFIG_XENBUS
+/* This should be overridden by the application we are linked against. */
+__attribute__((weak)) void app_shutdown(unsigned reason)
 {
-    static char hello[] = "Bootstrapping...\n";
+    printk("Shutdown requested: %d\n", reason);
+    struct sched_shutdown sched_shutdown = { .reason = reason };
+    HYPERVISOR_sched_op(SCHEDOP_shutdown, &sched_shutdown);
+}
 
-    (void)HYPERVISOR_console_io(CONSOLEIO_write, strlen(hello), hello);
+static void shutdown_thread(void *p)
+{
+    const char *path = "control/shutdown";
+    const char *token = path;
+    xenbus_event_queue events = NULL;
+    char *shutdown = NULL, *err;
+    unsigned int shutdown_reason;
+    xenbus_watch_path_token(XBT_NIL, path, token, &events);
+    while ((err = xenbus_read(XBT_NIL, path, &shutdown)) != NULL || !strcmp(shutdown, ""))
+    {
+        if (err)
+            free(err);
+        if (shutdown)
+        {
+            free(shutdown);
+            shutdown = NULL;
+        }
+        xenbus_wait_for_watch(&events);
+    }
+    err = xenbus_unwatch_path_token(XBT_NIL, path, token);
+    free(err);
+    err = xenbus_write(XBT_NIL, path, "");
+    free(err);
+    printk("Shutting down (%s)\n", shutdown);
 
-    arch_init(si);
+    if (!strcmp(shutdown, "poweroff"))
+        shutdown_reason = SHUTDOWN_poweroff;
+    else if (!strcmp(shutdown, "reboot"))
+        shutdown_reason = SHUTDOWN_reboot;
+    else
+        /* Unknown */
+        shutdown_reason = SHUTDOWN_crash;
+    app_shutdown(shutdown_reason);
+    free(shutdown);
 
-    trap_init();
+    for (;;) ;
+}
+#endif
 
-    /* print out some useful information  */
-    printk("Mirage OS!\n");
-    printk("  start_info: %p(VA)\n", si);
-    printk("    nr_pages: 0x%lx\n", si->nr_pages);
-    printk("  shared_inf: 0x%08lx(MA)\n", si->shared_info);
-    printk("     pt_base: %p(VA)\n", (void *)si->pt_base); 
-    printk("nr_pt_frames: 0x%lx\n", si->nr_pt_frames);
-    printk("    mfn_list: %p(VA)\n", (void *)si->mfn_list); 
-    printk("   mod_start: 0x%lx(VA)\n", si->mod_start);
-    printk("     mod_len: %lu\n", si->mod_len); 
-    printk("       flags: 0x%x\n", (unsigned int)si->flags);
-    printk("    cmd_line: %s\n",  
-           si->cmd_line ? (const char *)si->cmd_line : "NULL");
 
+/* This should be overridden by the application we are linked against. */
+__attribute__((weak)) int app_main(start_info_t *si)
+{
+    printk("kernel.c: dummy main: start_info=%p\n", si);
+    return 0;
+}
+
+void dump_registers(int *saved_registers) {
+    int i;
+    printk("Fault!\n");
+    for (i = 0; i < 16; i++) {
+        printk("r%d = %x\n", i, saved_registers[i]);
+    }
+    printk("CPSR = %x\n", saved_registers[16]);
+}
+
+void gic_init(void);
+
+void start_kernel(void)
+{
     /* Set up events. */
     init_events();
 
-    /* ENABLE EVENT DELIVERY. This is disabled at start of day. */
-    local_irq_enable();
-    
-    arch_print_info();
+    __sti();
 
     setup_xen_features();
 
@@ -105,20 +145,78 @@ void start_kernel(start_info_t *si)
     /* Init time and timers. */
     init_time();
 
-    /* Call (possibly overridden) app_main() */
-    app_main(&start_info);
+    /* Init the console driver. */
+    init_console();
 
-    /* If we do end up here, then do a clean shutdown */
-    printk("app_main finished\n");
-    do_exit();
+    /* Init grant tables */
+    init_gnttab();
+
+    /* Init scheduler. */
+    init_sched();
+ 
+    /* Init XenBus */
+    init_xenbus();
+
+
+#ifdef CONFIG_XENBUS
+    create_thread("shutdown", shutdown_thread, NULL);
+#endif
+
+
+    gic_init();
+
+//#define VTIMER_TEST
+#ifdef VTIMER_TEST
+    while(1){
+        int x, y, z;
+        z = 0;
+        // counter
+        __asm__ __volatile__("mrrc p15, 1, %0, %1, c14;isb":"=r"(x), "=r"(y));
+        printk("Counter: %x-%x\n", x, y);
+
+        __asm__ __volatile__("mrrc p15, 3, %0, %1, c14;isb":"=r"(x), "=r"(y));
+        printk("CompareValue: %x-%x\n", x, y);
+
+        // TimerValue
+        __asm__ __volatile__("mrc p15, 0, %0, c14, c3, 0;isb":"=r"(x));
+        printk("TimerValue: %x\n", x);
+
+        // control register
+        __asm__ __volatile__("mrc p15, 0, %0, c14, c3, 1;isb":"=r"(x));
+        printk("ControlRegister: %x\n", x);
+        while(z++ < 0xfffff){}
+    }
+#endif
+
+    /* Call (possibly overridden) app_main() */
+#if defined(__arm__) || defined(__aarch64__)
+    app_main(NULL);
+#else
+    app_main(&start_info);
+#endif
+
+    /* Everything initialised, start idle thread */
+    run_idle_thread();
 }
 
 void stop_kernel(void)
 {
+    /* TODO: fs import */
+
     local_irq_disable();
 
+#if 0
+    /* Reset grant tables */
+    fini_gnttab();
+#endif
+
+    /* Reset XenBus */
+    fini_xenbus();
+
+#if 0
     /* Reset timers */
     fini_time();
+#endif
 
     /* Reset memory management. */
     fini_mm();
@@ -126,12 +224,11 @@ void stop_kernel(void)
     /* Reset events. */
     fini_events();
 
-    /* Reset traps */
-    trap_fini();
-
     /* Reset arch details */
     arch_fini();
 }
+
+void arch_do_exit(void);
 
 /*
  * do_exit: This is called whenever an IRET fails in entry.S.
@@ -143,7 +240,7 @@ void stop_kernel(void)
 void do_exit(void)
 {
     printk("Do_exit called!\n");
-    stack_walk();
+    arch_do_exit();
     for( ;; )
     {
         struct sched_shutdown sched_shutdown = { .reason = SHUTDOWN_crash };

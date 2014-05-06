@@ -16,9 +16,8 @@
  * $Id: h-insert.h,v 1.4 2002/11/08 16:03:55 rn Exp $
  ****************************************************************************
  *
- *-
- * Copyright (c) 1991, 1993
- *      The Regents of the University of California.  All rights reserved.
+ * Copyright (c) 1992, 1993
+ *	The Regents of the University of California.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -28,10 +27,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *      This product includes software developed by the University of
- *      California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -48,8 +43,6 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *      @(#)stdarg.h    8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/i386/include/stdarg.h,v 1.10 1999/08/28 00:44:26 peter Exp $
  */
 
 #ifndef _LIB_H_
@@ -59,15 +52,54 @@
 #include <stddef.h>
 #include <xen/xen.h>
 #include <xen/event_channel.h>
+#include <sys/queue.h>
 #include "gntmap.h"
-#include <sys/types.h>
-#include <stdio.h>
-#include <string.h>
 
-long simple_strtol(const char *cp,char **endp,unsigned int base);
-unsigned long simple_strtoul(const char *cp,char **endp,unsigned int base);
-long long simple_strtoll(const char *cp,char **endp,unsigned int base);
-unsigned long long simple_strtoull(const char *cp,char **endp,unsigned int base);
+#ifdef HAVE_LIBC
+#include <stdio.h>
+#else
+#include <lib-gpl.h>
+#endif
+
+#ifdef HAVE_LIBC
+#include <string.h>
+#else
+/* string and memory manipulation */
+
+/*
+ * From:
+ *	@(#)libkern.h	8.1 (Berkeley) 6/10/93
+ * $FreeBSD$
+ */
+int	 memcmp(const void *b1, const void *b2, size_t len);
+
+char	*strcat(char * __restrict, const char * __restrict);
+int	 strcmp(const char *, const char *);
+char	*strcpy(char * __restrict, const char * __restrict);
+char	*strdup(const char *__restrict);
+
+size_t	 strlen(const char *);
+
+int	 strncmp(const char *, const char *, size_t);
+char	*strncpy(char * __restrict, const char * __restrict, size_t);
+
+char	*strstr(const char *, const char *);
+
+void * memmove(void * dest,const void *src,size_t count);
+void *memset(void *, int, size_t);
+
+char *strchr(const char *p, int ch);
+char *strrchr(const char *p, int ch);
+
+/* From:
+ *	@(#)systm.h	8.7 (Berkeley) 3/29/95
+ * $FreeBSD$
+ */
+void	*memcpy(void *to, const void *from, size_t len);
+void *memchr(const void *s, int c, size_t n);
+
+size_t strnlen(const char *, size_t);
+#endif
 
 #include <mini-os/console.h>
 
@@ -78,11 +110,6 @@ int rand(void);
 #include <mini-os/xenbus.h>
 
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
-
-struct kvec {
-    void *iov_base;
-    size_t iov_len;
-};
 
 #define ASSERT(x)                                              \
 do {                                                           \
@@ -100,19 +127,34 @@ do {                                                           \
 /* Consistency check as much as possible. */
 void sanity_check(void);
 
+#ifdef HAVE_LIBC
 enum fd_type {
     FTYPE_NONE = 0,
     FTYPE_CONSOLE,
+    FTYPE_FILE,
     FTYPE_XENBUS,
     FTYPE_XC,
     FTYPE_EVTCHN,
     FTYPE_GNTMAP,
     FTYPE_SOCKET,
+    FTYPE_TAP,
     FTYPE_BLK,
+    FTYPE_KBD,
+    FTYPE_FB,
     FTYPE_MEM,
+    FTYPE_SAVEFILE,
+    FTYPE_TPMFRONT,
+    FTYPE_TPM_TIS,
 };
 
-#define MAX_EVTCHN_PORTS 16
+LIST_HEAD(evtchn_port_list, evtchn_port_info);
+
+struct evtchn_port_info {
+        LIST_ENTRY(evtchn_port_info) list;
+        evtchn_port_t port;
+        unsigned long pending;
+        int bound;
+};
 
 extern struct file {
     enum fd_type type;
@@ -127,13 +169,7 @@ extern struct file {
 	    off_t offset;
 	} file;
 	struct {
-            /* To each event channel FD is associated a series of ports which
-             * wakes select for this FD. */
-            struct {
-                evtchn_port_t port;
-                unsigned long pending;
-                int bound;
-            } ports[MAX_EVTCHN_PORTS];
+	    struct evtchn_port_list ports;
 	} evtchn;
 	struct gntmap gntmap;
 	struct {
@@ -141,6 +177,7 @@ extern struct file {
 	} tap;
 	struct {
 	    struct blkfront_dev *dev;
+            off_t offset;
 	} blk;
 	struct {
 	    struct kbdfront_dev *dev;
@@ -151,11 +188,27 @@ extern struct file {
 	struct {
 	    struct consfront_dev *dev;
 	} cons;
+#ifdef CONFIG_TPMFRONT
+	struct {
+	   struct tpmfront_dev *dev;
+	   int respgot;
+	   off_t offset;
+	} tpmfront;
+#endif
+#ifdef CONFIG_TPM_TIS
+	struct {
+	   struct tpm_chip *dev;
+	   int respgot;
+	   off_t offset;
+	} tpm_tis;
+#endif
+#ifdef CONFIG_XENBUS
         struct {
             /* To each xenbus FD is associated a queue of watch events for this
              * FD.  */
             xenbus_event_queue events;
         } xenbus;
+#endif
     };
     int read;	/* maybe available for read */
 } files[];
@@ -164,5 +217,6 @@ int alloc_fd(enum fd_type type);
 void close_all_files(void);
 extern struct thread *main_thread;
 void sparse(unsigned long data, size_t size);
+#endif
 
 #endif /* _LIB_H_ */

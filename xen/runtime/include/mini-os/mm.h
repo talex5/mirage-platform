@@ -25,12 +25,20 @@
 #ifndef _MM_H_
 #define _MM_H_
 
+#if defined(__i386__)
+#include <xen/arch-x86_32.h>
+#elif defined(__x86_64__)
 #include <xen/arch-x86_64.h>
+#elif defined(__arm__) || defined(__aarch64__)
+#include <xen/arch-arm.h>
+#else
+#error "Unsupported architecture"
+#endif
 
 #include <mini-os/lib.h>
 
-#include <mini-os/x86/arch_limits.h>
-#include <mini-os/x86/arch_mm.h>
+#include <mini-os/arch_limits.h>
+#include <mini-os/arch_mm.h>
 
 #define STACK_SIZE_PAGE_ORDER __STACK_SIZE_PAGE_ORDER
 #define STACK_SIZE __STACK_SIZE
@@ -57,17 +65,19 @@ void arch_init_p2m(unsigned long max_pfn_p);
 
 unsigned long allocate_ondemand(unsigned long n, unsigned long alignment);
 /* map f[i*stride]+i*increment for i in 0..n-1, aligned on alignment pages */
-void *map_frames_ex(unsigned long *f, unsigned long n, unsigned long stride,
+void *map_frames_ex(const unsigned long *f, unsigned long n, unsigned long stride,
 	unsigned long increment, unsigned long alignment, domid_t id,
-	int may_fail, unsigned long prot);
+	int *err, unsigned long prot);
 void do_map_frames(unsigned long addr,
-        unsigned long *f, unsigned long n, unsigned long stride,
-	unsigned long increment, domid_t id, int may_fail, unsigned long prot);
+        const unsigned long *f, unsigned long n, unsigned long stride,
+	unsigned long increment, domid_t id, int *err, unsigned long prot);
 int unmap_frames(unsigned long va, unsigned long num_frames);
 unsigned long alloc_contig_pages(int order, unsigned int addr_bits);
+#ifdef HAVE_LIBC
 extern unsigned long heap, brk, heap_mapped, heap_end;
+#endif
 
 int free_physical_pages(xen_pfn_t *mfns, int n);
 void fini_mm(void);
-int allocate_va_mapping(unsigned long va, unsigned long nr_pages, int superpages);
+
 #endif /* _MM_H_ */
