@@ -18,6 +18,9 @@ if [ $GCC_MVER2 -ge 8 ]; then
   EXTRA_CFLAGS=-fno-tree-loop-distribute-patterns
 fi
 
+TARGET=TARGET_amd64
+TARGET_ARCH_FAM=arm
+
 case "$1" in
 xen)
   CC=${CC:-cc}
@@ -28,7 +31,7 @@ xen)
     -fno-stack-protector -m64 -mno-red-zone -fno-reorder-blocks -fstrict-aliasing \
     -momit-leaf-frame-pointer -mfancy-math-387 -I${GCC_INCLUDE}/include \
     -isystem ${PWD}/runtime/include/ -isystem ${PWD}/runtime/include/mini-os \
-    -isystem ${PWD}/runtime/include/mini-os/x86 -DCAML_NAME_SPACE -DTARGET_amd64 
+    -isystem ${PWD}/runtime/include/mini-os/${TARGET_ARCH_FAM} -DCAML_NAME_SPACE -D${TARGET}  \
     -DSYS_xen -I${PWD}/runtime/ocaml -I${PWD}/runtime/libm \
     -Wextra -Wchar-subscripts -Wno-switch \
     -Wno-unused -Wredundant-decls -D__dietlibc__ -I${PWD}/runtime/dietlibc \
