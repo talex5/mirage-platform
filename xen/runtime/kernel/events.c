@@ -39,6 +39,7 @@ static unsigned long bound_ports[NR_EVS/(8*sizeof(unsigned long))];
 
 void unbind_all_ports(void)
 {
+#if 0
     int i;
     int cpu = 0;
     shared_info_t *s = HYPERVISOR_shared_info;
@@ -65,6 +66,7 @@ void unbind_all_ports(void)
     }
     vcpu_info->evtchn_upcall_pending = 0;
     vcpu_info->evtchn_pending_sel = 0;
+#endif
 }
 
 /*

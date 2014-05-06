@@ -33,7 +33,7 @@
  */
 union start_info_union
 {
-    start_info_t start_info;
+    /* start_info_t start_info; */
     char padding[512];
 };
 extern union start_info_union start_info_union;

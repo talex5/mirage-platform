@@ -755,7 +755,6 @@ struct start_info {
     unsigned long first_p2m_pfn;/* 1st pfn forming initial P->M table.    */
     unsigned long nr_p2m_frames;/* # of pfns forming initial P->M table.  */
 };
-typedef struct start_info start_info_t;
 
 /* New console union for dom0 introduced in 0x00030203. */
 #if __XEN_INTERFACE_VERSION__ < 0x00030203
@@ -763,6 +762,7 @@ typedef struct start_info start_info_t;
 #define console_evtchn console.domU.evtchn
 #endif
 #endif /* XEN_HAVE_PV_GUEST_ENTRY */
+typedef struct start_info start_info_t;
 
 /* These flags are passed in the 'flags' field of start_info_t. */
 #define SIF_PRIVILEGED    (1<<0)  /* Is the domain privileged? */

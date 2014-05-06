@@ -94,7 +94,7 @@ __extension__ typedef signed long long off64_t;
 #if defined _FILE_OFFSET_BITS && _FILE_OFFSET_BITS == 64
 typedef off64_t off_t;
 #else
-typedef signed long off_t;             /* Used for file sizes. */
+typedef uint64_t off_t;             /* Used for file sizes. */
 #endif
 
 __extension__ typedef unsigned long long ino64_t;
