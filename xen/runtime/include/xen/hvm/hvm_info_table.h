@@ -29,13 +29,13 @@
 #define HVM_INFO_OFFSET      0x800
 #define HVM_INFO_PADDR       ((HVM_INFO_PFN << 12) + HVM_INFO_OFFSET)
 
+/* Maximum we can support with current vLAPIC ID mapping. */
+#define HVM_MAX_VCPUS        128
+
 struct hvm_info_table {
     char        signature[8]; /* "HVM INFO" */
     uint32_t    length;
     uint8_t     checksum;
-
-    /* Should firmware build ACPI tables? */
-    uint8_t     acpi_enabled;
 
     /* Should firmware build APIC descriptors (APIC MADT / MP BIOS)? */
     uint8_t     apic_mode;
@@ -64,6 +64,9 @@ struct hvm_info_table {
      *    RAM above 4GB
      */
     uint32_t    high_mem_pgend;
+
+    /* Bitmap of which CPUs are online at boot time. */
+    uint8_t     vcpu_online[(HVM_MAX_VCPUS + 7)/8];
 };
 
 #endif /* __XEN_PUBLIC_HVM_HVM_INFO_TABLE_H__ */

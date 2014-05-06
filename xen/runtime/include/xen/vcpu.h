@@ -187,8 +187,7 @@ DEFINE_XEN_GUEST_HANDLE(vcpu_register_vcpu_info_t);
 /* 
  * Get the physical ID information for a pinned vcpu's underlying physical
  * processor.  The physical ID informmation is architecture-specific.
- * On x86: id[31:0]=apic_id, id[63:32]=acpi_id, and all values 0xff and
- *         greater are reserved.
+ * On x86: id[31:0]=apic_id, id[63:32]=acpi_id.
  * This command returns -EINVAL if it is not a valid operation for this VCPU.
  */
 #define VCPUOP_get_physid           12 /* arg == vcpu_get_physid_t */
@@ -197,10 +196,8 @@ struct vcpu_get_physid {
 };
 typedef struct vcpu_get_physid vcpu_get_physid_t;
 DEFINE_XEN_GUEST_HANDLE(vcpu_get_physid_t);
-#define xen_vcpu_physid_to_x86_apicid(physid) \
-    ((((uint32_t)(physid)) >= 0xff) ? 0xff : ((uint8_t)(physid)))
-#define xen_vcpu_physid_to_x86_acpiid(physid) \
-    ((((uint32_t)((physid)>>32)) >= 0xff) ? 0xff : ((uint8_t)((physid)>>32)))
+#define xen_vcpu_physid_to_x86_apicid(physid) ((uint32_t)(physid))
+#define xen_vcpu_physid_to_x86_acpiid(physid) ((uint32_t)((physid) >> 32))
 
 /* 
  * Register a memory location to get a secondary copy of the vcpu time
@@ -235,7 +232,7 @@ DEFINE_XEN_GUEST_HANDLE(vcpu_register_time_memory_area_t);
 /*
  * Local variables:
  * mode: C
- * c-set-style: "BSD"
+ * c-file-style: "BSD"
  * c-basic-offset: 4
  * tab-width: 4
  * indent-tabs-mode: nil

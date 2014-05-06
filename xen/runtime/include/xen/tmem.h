@@ -29,18 +29,23 @@
 
 #include "xen.h"
 
+/* version of ABI */
+#define TMEM_SPEC_VERSION          1
+
 /* Commands to HYPERVISOR_tmem_op() */
 #define TMEM_CONTROL               0
 #define TMEM_NEW_POOL              1
 #define TMEM_DESTROY_POOL          2
-#define TMEM_NEW_PAGE              3
 #define TMEM_PUT_PAGE              4
 #define TMEM_GET_PAGE              5
 #define TMEM_FLUSH_PAGE            6
 #define TMEM_FLUSH_OBJECT          7
+#if __XEN_INTERFACE_VERSION__ < 0x00040400
+#define TMEM_NEW_PAGE              3
 #define TMEM_READ                  8
 #define TMEM_WRITE                 9
 #define TMEM_XCHG                 10
+#endif
 
 /* Privileged commands to HYPERVISOR_tmem_op() */
 #define TMEM_AUTH                 101 
@@ -75,10 +80,12 @@
 /* Bits for HYPERVISOR_tmem_op(TMEM_NEW_POOL) */
 #define TMEM_POOL_PERSIST          1
 #define TMEM_POOL_SHARED           2
+#define TMEM_POOL_PRECOMPRESSED    4
 #define TMEM_POOL_PAGESIZE_SHIFT   4
 #define TMEM_POOL_PAGESIZE_MASK  0xf
 #define TMEM_POOL_VERSION_SHIFT   24
 #define TMEM_POOL_VERSION_MASK  0xff
+#define TMEM_POOL_RESERVED_BITS  0x00ffff00
 
 /* Bits for client flags (save/restore) */
 #define TMEM_CLIENT_COMPRESS       1
@@ -90,7 +97,9 @@
 
 
 #ifndef __ASSEMBLY__
+#if __XEN_INTERFACE_VERSION__ < 0x00040400
 typedef xen_pfn_t tmem_cli_mfn_t;
+#endif
 typedef XEN_GUEST_HANDLE(char) tmem_cli_va_t;
 struct tmem_op {
     uint32_t cmd;
@@ -100,23 +109,23 @@ struct tmem_op {
             uint64_t uuid[2];
             uint32_t flags;
             uint32_t arg1;
-        } new; /* for cmd == TMEM_NEW_POOL, TMEM_AUTH, TMEM_RESTORE_NEW */
+        } creat; /* for cmd == TMEM_NEW_POOL, TMEM_AUTH, TMEM_RESTORE_NEW */
         struct { 
             uint32_t subop;
             uint32_t cli_id;
             uint32_t arg1;
             uint32_t arg2;
-            uint64_t arg3;
+            uint64_t oid[3];
             tmem_cli_va_t buf;
         } ctrl; /* for cmd == TMEM_CONTROL */
         struct {
             
-            uint64_t object;
+            uint64_t oid[3];
             uint32_t index;
             uint32_t tmem_offset;
             uint32_t pfn_offset;
             uint32_t len;
-            tmem_cli_mfn_t cmfn; /* client machine page frame */
+            xen_pfn_t cmfn; /* client machine page frame */
         } gen; /* for all other cmd ("generic") */
     } u;
 };
@@ -126,9 +135,8 @@ DEFINE_XEN_GUEST_HANDLE(tmem_op_t);
 struct tmem_handle {
     uint32_t pool_id;
     uint32_t index;
-    uint64_t oid;
+    uint64_t oid[3];
 };
-
 #endif
 
 #endif /* __XEN_PUBLIC_TMEM_H__ */
@@ -136,7 +144,7 @@ struct tmem_handle {
 /*
  * Local variables:
  * mode: C
- * c-set-style: "BSD"
+ * c-file-style: "BSD"
  * c-basic-offset: 4
  * tab-width: 4
  * indent-tabs-mode: nil

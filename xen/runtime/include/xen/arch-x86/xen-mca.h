@@ -233,10 +233,11 @@ struct mcinfo_recovery
 #define MCINFO_HYPERCALLSIZE	1024
 #define MCINFO_MAXSIZE		768
 
+#define MCINFO_FLAGS_UNCOMPLETE 0x1
 struct mc_info {
     /* Number of mcinfo_* entries in mi_data */
     uint32_t mi_nentries;
-    uint32_t _pad0;
+    uint32_t flags;
     uint64_t mi_data[(MCINFO_MAXSIZE - 1) / 8];
 };
 typedef struct mc_info mc_info_t;
@@ -403,6 +404,20 @@ struct xen_mc_mceinject {
 	unsigned int mceinj_cpunr;      /* target processor id */
 };
 
+#if defined(__XEN__) || defined(__XEN_TOOLS__)
+#define XEN_MC_inject_v2        6
+#define XEN_MC_INJECT_TYPE_MASK     0x7
+#define XEN_MC_INJECT_TYPE_MCE      0x0
+#define XEN_MC_INJECT_TYPE_CMCI     0x1
+
+#define XEN_MC_INJECT_CPU_BROADCAST 0x8
+
+struct xen_mc_inject_v2 {
+	uint32_t flags;
+	struct xenctl_bitmap cpumap;
+};
+#endif
+
 struct xen_mc {
     uint32_t cmd;
     uint32_t interface_version; /* XEN_MCA_INTERFACE_VERSION */
@@ -412,6 +427,9 @@ struct xen_mc {
         struct xen_mc_physcpuinfo  mc_physcpuinfo;
         struct xen_mc_msrinject    mc_msrinject;
         struct xen_mc_mceinject    mc_mceinject;
+#if defined(__XEN__) || defined(__XEN_TOOLS__)
+        struct xen_mc_inject_v2    mc_inject_v2;
+#endif
     } u;
 };
 typedef struct xen_mc xen_mc_t;

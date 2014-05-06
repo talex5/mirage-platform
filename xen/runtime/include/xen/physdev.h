@@ -49,7 +49,15 @@ DEFINE_XEN_GUEST_HANDLE(physdev_eoi_t);
  * will automatically get unmasked. The page registered is used as a bit
  * array indexed by Xen's PIRQ value.
  */
-#define PHYSDEVOP_pirq_eoi_gmfn         17
+#define PHYSDEVOP_pirq_eoi_gmfn_v1       17
+/*
+ * Register a shared page for the hypervisor to indicate whether the
+ * guest must issue PHYSDEVOP_eoi. This hypercall is very similar to
+ * PHYSDEVOP_pirq_eoi_gmfn_v1 but it doesn't change the semantics of
+ * PHYSDEVOP_eoi. The page registered is used as a bit array indexed by
+ * Xen's PIRQ value.
+ */
+#define PHYSDEVOP_pirq_eoi_gmfn_v2       28
 struct physdev_pirq_eoi_gmfn {
     /* IN */
     xen_pfn_t gmfn;
@@ -142,21 +150,23 @@ DEFINE_XEN_GUEST_HANDLE(physdev_irq_t);
 #define MAP_PIRQ_TYPE_MSI               0x0
 #define MAP_PIRQ_TYPE_GSI               0x1
 #define MAP_PIRQ_TYPE_UNKNOWN           0x2
+#define MAP_PIRQ_TYPE_MSI_SEG           0x3
+#define MAP_PIRQ_TYPE_MULTI_MSI         0x4
 
 #define PHYSDEVOP_map_pirq               13
 struct physdev_map_pirq {
     domid_t domid;
     /* IN */
     int type;
-    /* IN */
+    /* IN (ignored for ..._MULTI_MSI) */
     int index;
     /* IN or OUT */
     int pirq;
-    /* IN */
+    /* IN - high 16 bits hold segment for ..._MSI_SEG and ..._MULTI_MSI */
     int bus;
     /* IN */
     int devfn;
-    /* IN */
+    /* IN (also OUT for ..._MULTI_MSI) */
     int entry_nr;
     /* IN */
     uint64_t table_base;
@@ -227,6 +237,106 @@ struct physdev_op {
 typedef struct physdev_op physdev_op_t;
 DEFINE_XEN_GUEST_HANDLE(physdev_op_t);
 
+#define PHYSDEVOP_setup_gsi    21
+struct physdev_setup_gsi {
+    int gsi;
+    /* IN */
+    uint8_t triggering;
+    /* IN */
+    uint8_t polarity;
+    /* IN */
+};
+
+typedef struct physdev_setup_gsi physdev_setup_gsi_t;
+DEFINE_XEN_GUEST_HANDLE(physdev_setup_gsi_t);
+
+/* leave PHYSDEVOP 22 free */
+
+/* type is MAP_PIRQ_TYPE_GSI or MAP_PIRQ_TYPE_MSI
+ * the hypercall returns a free pirq */
+#define PHYSDEVOP_get_free_pirq    23
+struct physdev_get_free_pirq {
+    /* IN */ 
+    int type;
+    /* OUT */
+    uint32_t pirq;
+};
+
+typedef struct physdev_get_free_pirq physdev_get_free_pirq_t;
+DEFINE_XEN_GUEST_HANDLE(physdev_get_free_pirq_t);
+
+#define XEN_PCI_MMCFG_RESERVED         0x1
+
+#define PHYSDEVOP_pci_mmcfg_reserved    24
+struct physdev_pci_mmcfg_reserved {
+    uint64_t address;
+    uint16_t segment;
+    uint8_t start_bus;
+    uint8_t end_bus;
+    uint32_t flags;
+};
+typedef struct physdev_pci_mmcfg_reserved physdev_pci_mmcfg_reserved_t;
+DEFINE_XEN_GUEST_HANDLE(physdev_pci_mmcfg_reserved_t);
+
+#define XEN_PCI_DEV_EXTFN              0x1
+#define XEN_PCI_DEV_VIRTFN             0x2
+#define XEN_PCI_DEV_PXM                0x4
+
+#define PHYSDEVOP_pci_device_add        25
+struct physdev_pci_device_add {
+    /* IN */
+    uint16_t seg;
+    uint8_t bus;
+    uint8_t devfn;
+    uint32_t flags;
+    struct {
+        uint8_t bus;
+        uint8_t devfn;
+    } physfn;
+#if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 199901L
+    uint32_t optarr[];
+#elif defined(__GNUC__)
+    uint32_t optarr[0];
+#endif
+};
+typedef struct physdev_pci_device_add physdev_pci_device_add_t;
+DEFINE_XEN_GUEST_HANDLE(physdev_pci_device_add_t);
+
+#define PHYSDEVOP_pci_device_remove     26
+#define PHYSDEVOP_restore_msi_ext       27
+/*
+ * Dom0 should use these two to announce MMIO resources assigned to
+ * MSI-X capable devices won't (prepare) or may (release) change.
+ */
+#define PHYSDEVOP_prepare_msix          30
+#define PHYSDEVOP_release_msix          31
+struct physdev_pci_device {
+    /* IN */
+    uint16_t seg;
+    uint8_t bus;
+    uint8_t devfn;
+};
+typedef struct physdev_pci_device physdev_pci_device_t;
+DEFINE_XEN_GUEST_HANDLE(physdev_pci_device_t);
+
+#define PHYSDEVOP_DBGP_RESET_PREPARE    1
+#define PHYSDEVOP_DBGP_RESET_DONE       2
+
+#define PHYSDEVOP_DBGP_BUS_UNKNOWN      0
+#define PHYSDEVOP_DBGP_BUS_PCI          1
+
+#define PHYSDEVOP_dbgp_op               29
+struct physdev_dbgp_op {
+    /* IN */
+    uint8_t op;
+    uint8_t bus;
+    union {
+        struct physdev_pci_device pci;
+    } u;
+};
+typedef struct physdev_dbgp_op physdev_dbgp_op_t;
+DEFINE_XEN_GUEST_HANDLE(physdev_dbgp_op_t);
+
 /*
  * Notify that some PIRQ-bound event channels have been unmasked.
  * ** This command is obsolete since interface version 0x00030202 and is **
@@ -248,12 +358,18 @@ DEFINE_XEN_GUEST_HANDLE(physdev_op_t);
 #define PHYSDEVOP_IRQ_NEEDS_UNMASK_NOTIFY XENIRQSTAT_needs_eoi
 #define PHYSDEVOP_IRQ_SHARED             XENIRQSTAT_shared
 
+#if __XEN_INTERFACE_VERSION__ < 0x00040200
+#define PHYSDEVOP_pirq_eoi_gmfn PHYSDEVOP_pirq_eoi_gmfn_v1
+#else
+#define PHYSDEVOP_pirq_eoi_gmfn PHYSDEVOP_pirq_eoi_gmfn_v2
+#endif
+
 #endif /* __XEN_PUBLIC_PHYSDEV_H__ */
 
 /*
  * Local variables:
  * mode: C
- * c-set-style: "BSD"
+ * c-file-style: "BSD"
  * c-basic-offset: 4
  * tab-width: 4
  * indent-tabs-mode: nil
