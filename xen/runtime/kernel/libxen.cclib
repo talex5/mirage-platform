@@ -16,3 +16,4 @@ mm.o
 sched.o
 time.o
 lib/xmalloc.o
+lib/stack_chk_fail.c
