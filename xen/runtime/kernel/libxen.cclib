@@ -1,3 +1,10 @@
+arch/arm/arm32.o
+arch/arm/divsi3.o
+arch/arm/hypercalls32.o
+arch/arm/ldivmod.o
+console/console.o
+console/xenbus.o
+console/xencons_ring.o
 events.o
 gntmap.o
 gnttab.o

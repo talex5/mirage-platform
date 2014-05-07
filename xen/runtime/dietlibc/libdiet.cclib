@@ -1,3 +1,11 @@
+arm/aeabi_unwind_cpp.o
+arm/guard.o
+arm/longjmp.o
+arm/mcount.o
+arm/setjmp.o
+arm/strcpy.o
+arm/strlen.o
+arm/testandset.o
 lib/abs.o
 lib/atof.o
 lib/atoi.o

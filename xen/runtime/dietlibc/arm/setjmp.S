@@ -9,7 +9,7 @@ __sigsetjmp:
 .weak sigsetjmp
 sigsetjmp:
 #ifndef	__SOFTFP__
-	sfm	f4, 4, [r0], #48
+	@ sfm	f4, 4, [r0], #48
 #endif
 	stmia	r0, {r4-r11, sp, lr}
 	sub	r0, r0, #48
