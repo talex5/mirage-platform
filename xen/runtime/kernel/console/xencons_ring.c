@@ -34,18 +34,13 @@ static inline int hvm_get_parameter(int idx, uint64_t *value)
 static inline void notify_daemon(struct consfront_dev *dev)
 {
     /* Use evtchn: this is called early, before irq is set up. */
-    if (!dev)
-        notify_remote_via_evtchn(start_info.console.domU.evtchn);
-    else
+    if (dev)
         notify_remote_via_evtchn(dev->evtchn);
 }
 
 static inline struct xencons_interface *xencons_interface(void)
 {
-    if (start_info.console.domU.evtchn)
-        return mfn_to_virt(start_info.console.domU.mfn);
-    else
-        return NULL;
+    return NULL;
 }
 
 int xencons_ring_send_no_notify(struct consfront_dev *dev, const char *data, unsigned len)
