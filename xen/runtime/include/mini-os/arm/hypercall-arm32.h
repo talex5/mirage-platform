@@ -38,32 +38,32 @@
 #include <xen/sched.h>
 #include <mini-os/mm.h>
 
-inline int
+int
 HYPERVISOR_mmu_update(
 	mmu_update_t *req, int count, int *success_count, domid_t domid);
 
-inline int
+int
 HYPERVISOR_mmuext_op(
 	struct mmuext_op *op, int count, int *success_count, domid_t domid);
 
-inline int
+int
 HYPERVISOR_set_gdt(
 	unsigned long *frame_list, int entries);
 
-inline int
+int
 HYPERVISOR_stack_switch(
 	unsigned long ss, unsigned long esp);
 
-inline int
+int
 HYPERVISOR_set_callbacks(
 	unsigned long event_address, unsigned long failsafe_address, 
 	unsigned long syscall_address);
 
-inline int
+int
 HYPERVISOR_fpu_taskswitch(
 	int set);
 
-inline int
+int
 HYPERVISOR_sched_op(
 	int cmd, void *arg);
 
@@ -75,88 +75,88 @@ HYPERVISOR_shutdown(
 	HYPERVISOR_sched_op(SCHEDOP_shutdown, &shutdown);
 }
 
-inline long
+long
 HYPERVISOR_set_timer_op(
 	uint64_t timeout);
 
-inline int
+int
 HYPERVISOR_set_debugreg(
 	int reg, unsigned long value);
 
-inline unsigned long
+unsigned long
 HYPERVISOR_get_debugreg(
 	int reg);
 
-inline int
+int
 HYPERVISOR_update_descriptor(
 	unsigned long ma, unsigned long word);
 
-inline int
+int
 HYPERVISOR_memory_op(
 	unsigned int cmd, void *arg);
 
-inline int
+int
 HYPERVISOR_multicall(
 	void *call_list, int nr_calls);
 
-inline int
+int
 HYPERVISOR_update_va_mapping(
 	unsigned long va, pte_t new_val, unsigned long flags);
 
-inline int
+int
 HYPERVISOR_event_channel_op(
        int cmd, void *op);
 
-inline int
+int
 HYPERVISOR_xen_version(
 	int cmd, void *arg);
 
-inline int
+int
 HYPERVISOR_console_io(
 	int cmd, int count, char *str);
 
-inline int
+int
 HYPERVISOR_physdev_op(
 	void *physdev_op);
 
-inline int
+int
 HYPERVISOR_grant_table_op(
 	unsigned int cmd, void *uop, unsigned int count);
 
-inline int
+int
 HYPERVISOR_update_va_mapping_otherdomain(
 	unsigned long va, pte_t new_val, unsigned long flags, domid_t domid);
 
-inline int
+int
 HYPERVISOR_vm_assist(
 	unsigned int cmd, unsigned int type);
 
-inline int
+int
 HYPERVISOR_vcpu_op(
 	int cmd, int vcpuid, void *extra_args);
 
-inline int
+int
 HYPERVISOR_set_segment_base(
 	int reg, unsigned long value);
 
-inline int
+int
 HYPERVISOR_suspend(
 	unsigned long srec);
 
-inline int
+int
 HYPERVISOR_nmi_op(
 	unsigned long op,
 	unsigned long arg);
 
-inline int
+int
 HYPERVISOR_sysctl(
 	unsigned long op);
 
-inline int
+int
 HYPERVISOR_domctl(
 	unsigned long op);
 
-inline int
+int
 HYPERVISOR_hvm_op(
 	unsigned long op, void *arg);
 
