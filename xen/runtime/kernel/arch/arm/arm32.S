@@ -87,6 +87,9 @@ page_dir:
 	.fill (4*1024), 4, 0x0
 fault_dump:
 	.fill 17, 4, 0x0		@ On fault, we save the registers + CPSR here
+.globl errno
+errno:
+	.fill 1, 4, 0x0
 
 .popsection
 
