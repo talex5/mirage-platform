@@ -34,15 +34,13 @@
  * DEALINGS IN THE SOFTWARE.
  */
 
-#include <mini-os/x86/os.h>
+#include <mini-os/os.h>
 #include <mini-os/hypervisor.h>
 #include <xen/memory.h>
 #include <mini-os/mm.h>
 #include <mini-os/types.h>
 #include <mini-os/lib.h>
 #include <mini-os/xmalloc.h>
-#include <errno.h>
-#include <log.h>
 
 #ifdef MM_DEBUG
 #define DEBUG(_f, _a...) \
@@ -54,13 +52,21 @@
 /*********************
  * ALLOCATION BITMAP
  *  One bit per page of memory. Bit set => page is allocated.
+ * Note: the first entry in alloc_bitmap corresponds to the address of alloc_bitmap itself (and is therefore never used).
+ * alloc_bitmap is page aligned.
  */
 
 static unsigned long *alloc_bitmap;
 #define PAGES_PER_MAPWORD (sizeof(unsigned long) * 8)
 
-#define allocated_in_map(_pn) \
-(alloc_bitmap[(_pn)/PAGES_PER_MAPWORD] & (1UL<<((_pn)&(PAGES_PER_MAPWORD-1))))
+/** Convert a physical page number to the number of the page relative to the heap base. */
+#define PAGE_INDEX(pg) ((pg) - (((unsigned long) alloc_bitmap)>>PAGE_SHIFT))
+
+static inline int allocated_in_map(int pn)
+{
+    int i = PAGE_INDEX(pn);
+    return alloc_bitmap[i] & (1UL << (i & (PAGES_PER_MAPWORD - 1)));
+}
 
 /*
  * Hint regarding bitwise arithmetic in map_{alloc,free}:
@@ -71,15 +77,15 @@ static unsigned long *alloc_bitmap;
  *  *_off == Bit offset within an element of the `alloc_bitmap' array.
  */
 
-static void
-map_alloc(unsigned long first_page, unsigned long nr_pages)
+static void map_alloc(unsigned long first_page, unsigned long nr_pages)
 {
     unsigned long start_off, end_off, curr_idx, end_idx;
+    int start_index = PAGE_INDEX(first_page);
 
-    curr_idx  = first_page / PAGES_PER_MAPWORD;
-    start_off = first_page & (PAGES_PER_MAPWORD-1);
-    end_idx   = (first_page + nr_pages) / PAGES_PER_MAPWORD;
-    end_off   = (first_page + nr_pages) & (PAGES_PER_MAPWORD-1);
+    curr_idx  = start_index / PAGES_PER_MAPWORD;
+    start_off = start_index & (PAGES_PER_MAPWORD-1);
+    end_idx   = (start_index + nr_pages) / PAGES_PER_MAPWORD;
+    end_off   = (start_index + nr_pages) & (PAGES_PER_MAPWORD-1);
 
     if ( curr_idx == end_idx )
     {
@@ -94,15 +100,15 @@ map_alloc(unsigned long first_page, unsigned long nr_pages)
 }
 
 
-static void
-map_free(unsigned long first_page, unsigned long nr_pages)
+static void map_free(unsigned long first_page, unsigned long nr_pages)
 {
     unsigned long start_off, end_off, curr_idx, end_idx;
+    int start_index = PAGE_INDEX(first_page);
 
-    curr_idx = first_page / PAGES_PER_MAPWORD;
-    start_off = first_page & (PAGES_PER_MAPWORD-1);
-    end_idx   = (first_page + nr_pages) / PAGES_PER_MAPWORD;
-    end_off   = (first_page + nr_pages) & (PAGES_PER_MAPWORD-1);
+    curr_idx = start_index / PAGES_PER_MAPWORD;
+    start_off = start_index & (PAGES_PER_MAPWORD-1);
+    end_idx   = (start_index + nr_pages) / PAGES_PER_MAPWORD;
+    end_off   = (start_index + nr_pages) & (PAGES_PER_MAPWORD-1);
 
     if ( curr_idx == end_idx )
     {
@@ -217,21 +223,25 @@ static void init_page_allocator(unsigned long min, unsigned long max)
     min = round_pgup  (min);
     max = round_pgdown(max);
 
+
     /* Allocate space for the allocation bitmap. */
-    bitmap_size  = (max+1) >> (PAGE_SHIFT+3);
+    bitmap_size  = (max - min + 1) >> (PAGE_SHIFT+3);
     bitmap_size  = round_pgup(bitmap_size);
     alloc_bitmap = (unsigned long *)to_virt(min);
     min         += bitmap_size;
     range        = max - min;
+
 
     /* All allocated by default. */
     memset(alloc_bitmap, ~0, bitmap_size);
     /* Free up the memory we've been given to play with. */
     map_free(PHYS_PFN(min), range>>PAGE_SHIFT);
 
+
     /* The buddy lists are addressed in high memory. */
     min = (unsigned long) to_virt(min);
     max = (unsigned long) to_virt(max);
+
 
     while ( range != 0 )
     {
@@ -241,7 +251,6 @@ static void init_page_allocator(unsigned long min, unsigned long max)
          */
         for ( i = PAGE_SHIFT; (1UL<<(i+1)) <= range; i++ )
             if ( min & (1UL<<i) ) break;
-
 
         ch = (chunk_head_t *)min;
         min   += (1UL<<i);
@@ -268,8 +277,8 @@ unsigned long alloc_pages(int order)
 
     /* Find smallest order which can satisfy the request. */
     for ( i = order; i < FREELIST_SIZE; i++ ) {
-    if ( !FREELIST_EMPTY(free_head[i]) ) 
-        break;
+	if ( !FREELIST_EMPTY(free_head[i]) ) 
+	    break;
     }
 
     if ( i == FREELIST_SIZE ) goto no_memory;
@@ -376,24 +385,106 @@ int free_physical_pages(xen_pfn_t *mfns, int n)
     return HYPERVISOR_memory_op(XENMEM_decrease_reservation, &reservation);
 }
 
+#ifdef HAVE_LIBC
+void *sbrk(ptrdiff_t increment)
+{
+    unsigned long old_brk = brk;
+    unsigned long new_brk = old_brk + increment;
+
+    if (new_brk > heap_end) {
+	printk("Heap exhausted: %p + %lx = %p > %p\n", old_brk, increment, new_brk, heap_end);
+	return NULL;
+    }
+    
+    if (new_brk > heap_mapped) {
+        unsigned long n = (new_brk - heap_mapped + PAGE_SIZE - 1) / PAGE_SIZE;
+        do_map_zero(heap_mapped, n);
+        heap_mapped += n * PAGE_SIZE;
+    }
+
+    brk = new_brk;
+
+    return (void *) old_brk;
+}
+#endif
+
+#ifdef MM_DEBUG
+static void test_memory(void) {
+    uint32_t *prev = NULL;
+    int i;
+
+    int size = 4096 * 1024;
+    for (;;) {
+        uint32_t *block = malloc(size);
+
+        printk("malloc(%d) -> %p\n", size, block);
+
+        if (!block) {
+            size >>= 1;
+            if (size < 8) {
+                break;
+            }
+        } else {
+            /* Add to linked list. */
+            block[0] = (int) prev;
+            block[1] = size;
+            prev = block;
+
+            /* Fill the remaining words of the page with their addresses. */
+            for (i = 2; i < size / 4; i++) {
+                block[i] = (uint32_t) (block + i);
+            }
+        }
+    }
+
+    printk("Checking...\n");
+
+    while (prev) {
+        uint32_t *block = prev;
+        int size = block[1];
+        prev = (uint32_t *) block[0];
+
+        printk("Checking block at %p (size = %d)\n", block, size);
+
+        for (i = 2; i < size / 4; i++) {
+            uint32_t expected = (uint32_t) (block + i);
+            if (block[i] != expected) {
+                printk("Corrupted: got %p at %p!\n", block[i], expected);
+                BUG();
+            }
+        }
+
+        free(block);
+    }
+
+    printk("Memory test passed\n");
+}
+#endif
+
 void init_mm(void)
 {
-
     unsigned long start_pfn, max_pfn;
-
     printk("MM: Init\n");
 
     arch_init_mm(&start_pfn, &max_pfn);
     /*
      * now we can initialise the page allocator
      */
-    printk("MM: Initialise page allocator for %p -> %p\n", pfn_to_virt(start_pfn), pfn_to_virt(max_pfn));
+    printk("MM: Initialise page allocator for %lx(%lx) - %lx(%lx)\n",
+           (unsigned long) to_virt(PFN_PHYS(start_pfn)), (unsigned long) PFN_PHYS(start_pfn),
+           (unsigned long) to_virt(PFN_PHYS(max_pfn)), (unsigned long) PFN_PHYS(max_pfn));
+
     init_page_allocator(PFN_PHYS(start_pfn), PFN_PHYS(max_pfn));
+
     printk("MM: done\n");
 
     arch_init_p2m(max_pfn);
     
     arch_init_demand_mapping_area(max_pfn);
+
+#ifdef MM_DEBUG
+    test_memory();
+#endif
 }
 
 void fini_mm(void)
@@ -416,39 +507,3 @@ void sanity_check(void)
         }
     }
 }
-
-int allocate_va_mapping(unsigned long va, unsigned long nr_pages, int superpages)
-{
-    int i;
-    int order = superpages ? 9:0;
-
-    if (va & ((1UL<<order)<<PAGE_SHIFT)-1)
-        return -EINVAL;
-
-    for (i=0; i<(nr_pages<<order); i++)
-        if(need_pgt(va + (i<<PAGE_SHIFT), 0, 0))
-            return -EADDRINUSE;
-    
-    for (i=0; i<nr_pages; i++)
-    {
-        int j = 0;
-        unsigned long mfns[1];
-        unsigned long cva = alloc_contig_pages(order,0);
-
-        if (cva == 0)
-        {
-            DEBUG("%s: alloc_contig_pages failed [i=%d]\n",
-                 __func__,i);
-            return -ENOMEM;
-        }
-
-        mfns[0] = virt_to_mfn(cva);
-        
-        do_map_frames(va, mfns, 1, 1, 0, DOMID_SELF, 0, L1_PROT |( superpages ? _PAGE_PSE : 0));
-
-        va += ((1UL<<order)<<PAGE_SHIFT);
-    }
-
-    return 0;
-}
-

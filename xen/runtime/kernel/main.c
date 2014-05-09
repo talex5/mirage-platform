@@ -1,76 +1,192 @@
 /*
- * Copyright (c) 2011 Anil Madhavapeddy <anil@recoil.org>
+ * POSIX-compatible main layer
  *
- * Permission to use, copy, modify, and distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
- *
- * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
- * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
- * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
- * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
- * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
- * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
- * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+ * Samuel Thibault <Samuel.Thibault@eu.citrix.net>, October 2007
  */
 
-#include <mini-os/x86/os.h>
-#include <mini-os/sched.h>
+#ifdef HAVE_LIBC
+#include <os.h>
+#include <sched.h>
+#include <console.h>
+#include <netfront.h>
+#include <pcifront.h>
+#include <time.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <xenbus.h>
+#include <events.h>
 
-#include <caml/mlvalues.h>
-#include <caml/memory.h>
-#include <caml/callback.h>
+extern int main(int argc, char *argv[], char *envp[]);
+extern void __libc_init_array(void);
+extern void __libc_fini_array(void);
+extern unsigned long __CTOR_LIST__[];
+extern unsigned long __DTOR_LIST__[];
 
-void _exit(int);
-int errno;
-static char *argv[] = { "mirage", NULL };
-static unsigned long irqflags;
-
-CAMLprim value
-caml_block_domain(value v_timeout)
+#if 0
+#include <stdio.h>
+int main(int argc, char *argv[], char *envp[])
 {
-  CAMLparam1(v_timeout);
-  s_time_t block_nsecs = (s_time_t)(Double_val(v_timeout) * 1000000000);
-  HYPERVISOR_set_timer_op(NOW() + block_nsecs);
-  /* xen/common/schedule.c:do_block clears evtchn_upcall_mask
-     to re-enable interrupts. It blocks the domain and immediately
-     checks for pending events which otherwise may be missed. */
-  HYPERVISOR_sched_op(SCHEDOP_block, 0);
-  /* set evtchn_upcall_mask: there's no need to be interrupted
-     when we know we have outstanding work to do. When we next
-     call this function, the call to SCHEDOP_block will check
-     for pending events. */
-  local_irq_disable();
-  CAMLreturn(Val_unit);
+    printf("Hello, World!\n");
+    return 1;
+}
+#endif
+
+void _init(void)
+{
 }
 
-#define CAML_ENTRYPOINT "OS.Main.run"
-
-void app_main(start_info_t *si)
+void _fini(void)
 {
-  value *v_main;
-  int caml_completed = 0;
-  local_irq_save(irqflags);
-  caml_startup(argv);
-  v_main = caml_named_value(CAML_ENTRYPOINT);
-  if (v_main == NULL){
-	printk("ERROR: CAML_ENTRYPOINT %s is NULL\n", CAML_ENTRYPOINT);
-	_exit(1);
-  }
-  while (caml_completed == 0) {
-    caml_completed = Bool_val(caml_callback(*v_main, Val_unit));
-  }
-  _exit(0);
+}
+
+extern char __app_bss_start, __app_bss_end;
+static void call_main(void *p)
+{
+    char *c, quote;
+#ifdef CONFIG_QEMU_XS_ARGS
+    char *domargs, *msg;
+#endif
+    int argc;
+    char **argv;
+    char *envp[] = { NULL };
+#ifdef CONFIG_QEMU_XS_ARGS
+    char *vm;
+    char path[128];
+    int domid;
+#endif
+    int i;
+
+    /* Let other parts initialize (including console output) before maybe
+     * crashing. */
+    //sleep(1);
+
+#ifdef CONFIG_SPARSE_BSS
+    sparse((unsigned long) &__app_bss_start, &__app_bss_end - &__app_bss_start);
+#endif
+#if defined(HAVE_LWIP) && defined(CONFIG_START_NETWORK) && defined(CONFIG_NETFRONT)
+    start_networking();
+#endif
+#ifdef CONFIG_PCIFRONT
+    create_thread("pcifront", pcifront_watches, NULL);
+#endif
+
+#ifdef CONFIG_QEMU_XS_ARGS
+    /* Fetch argc, argv from XenStore */
+    domid = xenbus_read_integer("target");
+    if (domid == -1) {
+        printk("Couldn't read target\n");
+        do_exit();
+    }
+
+    snprintf(path, sizeof(path), "/local/domain/%d/vm", domid);
+    msg = xenbus_read(XBT_NIL, path, &vm);
+    if (msg) {
+        printk("Couldn't read vm path\n");
+        do_exit();
+    }
+    printk("dom vm is at %s\n", vm);
+
+    snprintf(path, sizeof(path), "%s/image/dmargs", vm);
+    free(vm);
+    msg = xenbus_read(XBT_NIL, path, &domargs);
+
+    if (msg) {
+        printk("Couldn't get stubdom args: %s\n", msg);
+        domargs = strdup("");
+    }
+#endif
+
+    argc = 1;
+
+#define PARSE_ARGS(ARGS,START,QUOTE,END) \
+    c = ARGS; \
+    quote = 0; \
+    while (*c) { \
+	if (*c != ' ') { \
+	    START; \
+	    while (*c) { \
+		if (quote) { \
+		    if (*c == quote) { \
+			quote = 0; \
+			QUOTE; \
+			continue; \
+		    } \
+		} else if (*c == ' ') \
+		    break; \
+		if (*c == '"' || *c == '\'') { \
+		    quote = *c; \
+		    QUOTE; \
+		    continue; \
+		} \
+		c++; \
+	    } \
+	} else { \
+            END; \
+	    while (*c == ' ') \
+		c++; \
+	} \
+    } \
+    if (quote) {\
+	printk("Warning: unterminated quotation %c\n", quote); \
+	quote = 0; \
+    }
+#define PARSE_ARGS_COUNT(ARGS) PARSE_ARGS(ARGS, argc++, c++, )
+#define PARSE_ARGS_STORE(ARGS) PARSE_ARGS(ARGS, argv[argc++] = c, memmove(c, c + 1, strlen(c + 1) + 1), *c++ = 0)
+
+    PARSE_ARGS_COUNT((char*)start_info.cmd_line);
+#ifdef CONFIG_QEMU_XS_ARGS
+    PARSE_ARGS_COUNT(domargs);
+#endif
+
+    argv = alloca((argc + 1) * sizeof(char *));
+    argv[0] = "main";
+    argc = 1;
+
+    PARSE_ARGS_STORE((char*)start_info.cmd_line)
+#ifdef CONFIG_QEMU_XS_ARGS
+    PARSE_ARGS_STORE(domargs)
+#endif
+
+    argv[argc] = NULL;
+
+    for (i = 0; i < argc; i++)
+	printf("\"%s\" ", argv[i]);
+    printf("\n");
+
+    __libc_init_array();
+    environ = envp;
+    for (i = 0; __CTOR_LIST__[i] != 0; i++)
+        ((void((*)(void)))__CTOR_LIST__[i]) ();
+    tzset();
+
+    exit(main(argc, argv, envp));
 }
 
 void _exit(int ret)
 {
-  printk("main returned %d\n", ret);
-  stop_kernel();
-  if (!ret) {
-    /* No problem, just shutdown.  */
-    struct sched_shutdown sched_shutdown = { .reason = SHUTDOWN_poweroff };
-    HYPERVISOR_sched_op(SCHEDOP_shutdown, &sched_shutdown);
-  }
-  do_exit();
+    int i;
+
+    for (i = 0; __DTOR_LIST__[i] != 0; i++)
+        ((void((*)(void)))__DTOR_LIST__[i]) ();
+    close_all_files();
+    __libc_fini_array();
+    printk("main returned %d\n", ret);
+#if defined(HAVE_LWIP) && defined(CONFIG_NETFRONT)
+    stop_networking();
+#endif
+    stop_kernel();
+    if (!ret) {
+	/* No problem, just shutdown.  */
+        struct sched_shutdown sched_shutdown = { .reason = SHUTDOWN_poweroff };
+        HYPERVISOR_sched_op(SCHEDOP_shutdown, &sched_shutdown);
+    }
+    do_exit();
 }
+
+int app_main(start_info_t *si)
+{
+    printk("main.c: dummy main: start_info=%p!!\n", si);
+    main_thread = create_thread("main", call_main, si);
+    return 0;
+}
+#endif
