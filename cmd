@@ -54,6 +54,7 @@ configure() {
 # invoke native code and byte code compiler targets
 compile() {
   # build bytecode files and C bindings always
+  make -C runtime/kernel libminios.a
   ${OCAMLBUILD} ${OCAMLBUILD_FLAGS} ${NAME}.all
 }
 

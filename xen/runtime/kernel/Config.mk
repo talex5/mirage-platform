@@ -1,6 +1,13 @@
 # Set mini-os root path, used in mini-os.mk.
-MINI-OS_ROOT=$(XEN_ROOT)/extras/mini-os
-export MINI-OS_ROOT
+
+OBJCOPY    = $(CROSS_COMPILE)objcopy
+
+XEN_COMPILE_ARCH    ?= $(shell uname -m | sed -e s/i.86/x86_32/ \
+                         -e s/i86pc/x86_32/ -e s/amd64/x86_64/ \
+                         -e s/armv7.*/arm32/ -e s/armv8.*/arm64/ \
+                         -e s/aarch64/arm64/)
+
+XEN_TARGET_ARCH     ?= $(XEN_COMPILE_ARCH)
 
 libc = $(stubdom)
 

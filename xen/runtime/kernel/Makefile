@@ -4,8 +4,9 @@
 # Makefile and a arch.mk.
 #
 
-export XEN_ROOT = $(CURDIR)/../..
-include $(XEN_ROOT)/Config.mk
+MINI-OS_ROOT=$(CURDIR)
+export MINI-OS_ROOT
+
 OBJ_DIR ?= $(CURDIR)
 
 ifeq ($(MINIOS_CONFIG),)
@@ -140,14 +141,6 @@ $(ARCH_LINKS):
 	$(arch_links)
 endif
 
-include/mini-os/list.h: $(XEN_ROOT)/tools/include/xen-external/bsd-sys-queue-h-seddery $(XEN_ROOT)/tools/include/xen-external/bsd-sys-queue.h
-	perl $^ --prefix=minios  >$@.new
-	$(call move-if-changed,$@.new,$@)
-
-.PHONY: links
-links: include/mini-os/list.h $(ARCH_LINKS)
-	[ -e include/xen ] || ln -sf ../../../xen/include/public include/xen
-
 .PHONY: arch_lib
 arch_lib:
 	$(MAKE) --directory=$(TARGET_ARCH_DIR) OBJ_DIR=$(OBJ_DIR)/$(TARGET_ARCH_DIR) || exit 1;
@@ -202,6 +195,9 @@ else
 	gzip -f -9 -c $@ >$@.gz
 endif
 
+libminios.a: $(HEAD_OBJ) $(APP_O) $(OBJS) arch_lib
+	ar rcs $@ $(HEAD_OBJ) $(APP_O) $(OBJS) $(wildcard $(OBJ_DIR)/$(TARGET_ARCH_DIR)/*.o)
+
 .PHONY: clean arch_clean
 
 arch_clean:
@@ -211,9 +207,7 @@ clean:	arch_clean
 	for dir in $(addprefix $(OBJ_DIR)/,$(SUBDIRS)); do \
 		rm -f $$dir/*.o; \
 	done
-	rm -f include/mini-os/list.h
 	rm -f $(OBJ_DIR)/*.o *~ $(OBJ_DIR)/core $(OBJ_DIR)/$(TARGET).elf $(OBJ_DIR)/$(TARGET).raw $(OBJ_DIR)/$(TARGET) $(OBJ_DIR)/$(TARGET).gz
-	find . $(OBJ_DIR) -type l | xargs rm -f
 	$(RM) $(OBJ_DIR)/lwip.a $(LWO)
 	rm -f tags TAGS
 
