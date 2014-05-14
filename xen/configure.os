@@ -30,7 +30,7 @@ xen)
     -momit-leaf-frame-pointer -mfancy-math-387 -I${GCC_INCLUDE}/include \
     -isystem ${PWD}/runtime/include/ -isystem ${PWD}/runtime/include/mini-os \
     -DCAML_NAME_SPACE -DTARGET_amd64 \
-    -DSYS_xen -I${PWD}/runtime/ocaml -I${PWD}/runtime/libm \
+    -DSYS_xen -I${PWD}/runtime/ocaml \
     -Wextra -Wchar-subscripts -Wno-switch \
     -Wno-unused -Wredundant-decls -isystem ${KERNEL_DIR}/include \
     -DNATIVE_CODE"

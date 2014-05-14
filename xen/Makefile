@@ -2,7 +2,7 @@
 
 OCAML_VERSION=$(shell readlink runtime/ocaml)
 
-EXTRA=runtime/libm/libm.a runtime/xencaml/libxencaml.a runtime/$(OCAML_VERSION)/libocaml.a
+EXTRA=runtime/xencaml/libxencaml.a runtime/$(OCAML_VERSION)/libocaml.a
 
 OCAMLFIND ?= ocamlfind
 
