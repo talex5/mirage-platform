@@ -16,6 +16,8 @@
 
 #include <mini-os/os.h>
 #include <mini-os/sched.h>
+#include <mini-os/hypervisor.h>
+#include <mini-os/kernel.h>
 
 #include <caml/mlvalues.h>
 #include <caml/memory.h>

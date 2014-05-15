@@ -13,6 +13,7 @@
  */
 
 #include <mini-os/os.h>
+#include <mini-os/hypervisor.h>
 
 #include <caml/mlvalues.h>
 #include <caml/memory.h>

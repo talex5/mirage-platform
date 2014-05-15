@@ -24,10 +24,15 @@
 
 #include <xen/xen.h>
 #include <mini-os/os.h>
+#include <mini-os/arch_mm.h>
+#include <mini-os/console.h>
 
 CAMLprim value
 stub_start_info_get(value unit)
 {
+#ifdef __arm__
+  caml_failwith("No start_info on ARM");
+#else
   CAMLparam1(unit);
   CAMLlocal2(result, tmp);
   char buf[MAX_GUEST_CMDLINE+1];
@@ -57,6 +62,7 @@ stub_start_info_get(value unit)
   Store_field(result, 15, Val_int(start_info.nr_p2m_frames));
 
   CAMLreturn(result);
+#endif
 }
 
 CAMLprim value
@@ -65,7 +71,7 @@ caml_console_start_page(value v_unit)
   CAMLparam1(v_unit);
   CAMLreturn(caml_ba_alloc_dims(CAML_BA_UINT8 | CAML_BA_C_LAYOUT,
                                 1,
-                                mfn_to_virt(start_info.console.domU.mfn),
+                                mfn_to_virt(opt_console_dev->ring),
                                 (long)PAGE_SIZE));
 }
 
@@ -75,6 +81,6 @@ caml_xenstore_start_page(value v_unit)
   CAMLparam1(v_unit);
   CAMLreturn(caml_ba_alloc_dims(CAML_BA_UINT8 | CAML_BA_C_LAYOUT,
                                 1,
-                                mfn_to_virt(start_info.store_mfn),
+                                xenstore_buf,
                                 (long)PAGE_SIZE));
 }
