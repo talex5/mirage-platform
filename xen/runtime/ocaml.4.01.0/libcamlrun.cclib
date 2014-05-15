@@ -1,4 +1,4 @@
-amd64.bc.o
+arm.bc.o
 alloc.bc.o
 array.bc.o
 backtrace.bc.o
