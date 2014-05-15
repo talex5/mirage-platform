@@ -24,12 +24,13 @@ xen)
   PWD=`pwd`
   GCC_INCLUDE=`env LANG=C ${CC} -print-search-dirs | sed -n -e 's/install: \(.*\)/\1/p'`
   KERNEL_DIR=`ocamlfind query minios-kernel`
-  CFLAGS="$EXTRA_CFLAGS -O3 -U __linux__ -U __FreeBSD__ -U __sun__ -D__MiniOS__ -D__MiniOS__ -D__x86_64__ \
+  CFLAGS="$EXTRA_CFLAGS -O3 -U __linux__ -U __FreeBSD__ -U __sun__ -D__MiniOS__ -D__MiniOS__ \
     -D__XEN_INTERFACE_VERSION__=0x00030205 -D__INSIDE_MINIOS__ -nostdinc -std=gnu99 \
-    -fno-stack-protector -m64 -mno-red-zone -fno-reorder-blocks -fstrict-aliasing \
-    -momit-leaf-frame-pointer -mfancy-math-387 -I${GCC_INCLUDE}/include \
+    -fno-stack-protector -fno-reorder-blocks -fstrict-aliasing \
+    -mfloat-abi=soft -marm -march=armv7-a -DTARGET_arm \
+    -I${GCC_INCLUDE}/include \
     -isystem ${PWD}/runtime/include/ -isystem ${PWD}/runtime/include/mini-os \
-    -DCAML_NAME_SPACE -DTARGET_amd64 \
+    -DCAML_NAME_SPACE -D__arm__ \
     -DSYS_xen -I${PWD}/runtime/ocaml \
     -Wextra -Wchar-subscripts -Wno-switch \
     -Wno-unused -Wredundant-decls -isystem ${KERNEL_DIR}/include \
