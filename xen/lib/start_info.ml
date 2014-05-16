@@ -19,4 +19,5 @@ type t = {
 
 external get: unit -> t = "stub_start_info_get"
 external console_start_page: unit -> Io_page.t = "caml_console_start_page"
+external console_evtchn: unit -> int = "caml_console_evtchn"
 external xenstore_start_page: unit -> Io_page.t = "caml_xenstore_start_page"

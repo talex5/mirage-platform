@@ -71,8 +71,15 @@ caml_console_start_page(value v_unit)
   CAMLparam1(v_unit);
   CAMLreturn(caml_ba_alloc_dims(CAML_BA_UINT8 | CAML_BA_C_LAYOUT,
                                 1,
-                                mfn_to_virt(opt_console_dev->ring),
+                                opt_console_dev->ring,
                                 (long)PAGE_SIZE));
+}
+
+CAMLprim value
+caml_console_evtchn(value v_unit)
+{
+  CAMLparam1(v_unit);
+  CAMLreturn(Val_int(opt_console_dev->evtchn));
 }
 
 CAMLprim value

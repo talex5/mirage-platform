@@ -28,6 +28,9 @@ val console_start_page: unit -> Io_page.t
 (** [console_start_page ()] is the console page automatically
     allocated by Xen. *)
 
+val console_evtchn: unit -> int
+(** [console_start_page ()] is the event channel for [console_start_page]. *)
+
 val xenstore_start_page: unit -> Io_page.t
 (** [xenstore_start_page ()] is the xenstore page automatically
     allocated by Xen. *)
