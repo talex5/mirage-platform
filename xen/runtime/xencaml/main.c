@@ -128,6 +128,19 @@ void* calloc(size_t nmemb, size_t _size)
   return x;
 }
 
+ssize_t write(int fd, const void *buf, size_t count)
+{
+  if (fd == 1 || fd == 2)
+  {
+    console_print(NULL, buf, count);
+  }
+  else
+  {
+    printk("Write to FD %d: '%*s'\n", fd, count, buf);
+  }
+  return count;
+}
+
 /* Not supported by FS yet.  */
 unsupported_function_crash(link);
 unsupported_function(int, readlink, -1);
@@ -252,7 +265,6 @@ unsupported_function_crash(close);
 unsupported_function_log(off_t, lseek, -1);
 unsupported_function_crash(fcntl);
 unsupported_function_crash(read);
-unsupported_function_crash(write);
 unsupported_function_crash(gmtime);
 unsupported_function_crash(strtod);
 unsupported_function_crash(atoi);
