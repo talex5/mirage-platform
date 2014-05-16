@@ -141,6 +141,12 @@ ssize_t write(int fd, const void *buf, size_t count)
   return count;
 }
 
+void exit(int status)
+{
+  printk("Mirage exiting with status %d\n", status);
+  do_exit();
+}
+
 /* Not supported by FS yet.  */
 unsupported_function_crash(link);
 unsupported_function(int, readlink, -1);
@@ -258,7 +264,6 @@ unsupported_function_crash(open64);
 unsupported_function_crash(stat);
 unsupported_function_crash(lstat);
 unsupported_function_crash(unlink);
-unsupported_function_crash(exit);
 unsupported_function_crash(getcwd);
 unsupported_function_crash(system);
 unsupported_function_crash(close);
