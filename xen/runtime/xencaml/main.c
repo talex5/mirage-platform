@@ -32,20 +32,10 @@ static char *argv[] = { "mirage", NULL };
 static unsigned long irqflags;
 
 CAMLprim value
-caml_block_domain(value v_timeout)
+caml_block_domain(value v_until)
 {
-  CAMLparam1(v_timeout);
-  s_time_t block_nsecs = (s_time_t)(Double_val(v_timeout) * 1000000000);
-  HYPERVISOR_set_timer_op(NOW() + block_nsecs);
-  /* xen/common/schedule.c:do_block clears evtchn_upcall_mask
-     to re-enable interrupts. It blocks the domain and immediately
-     checks for pending events which otherwise may be missed. */
-  HYPERVISOR_sched_op(SCHEDOP_block, 0);
-  /* set evtchn_upcall_mask: there's no need to be interrupted
-     when we know we have outstanding work to do. When we next
-     call this function, the call to SCHEDOP_block will check
-     for pending events. */
-  local_irq_disable();
+  CAMLparam1(v_until);
+  block_domain((s_time_t)(Double_val(v_until) * 1000000000));
   CAMLreturn(Val_unit);
 }
 
