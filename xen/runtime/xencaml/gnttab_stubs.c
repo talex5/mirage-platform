@@ -28,6 +28,8 @@
 /* For printk() */
 #include <log.h>
 
+extern grant_entry_t *gnttab_table;
+
 CAMLprim value stub_gnttab_interface_open(value unit)
 {
 	CAMLparam1(unit);
@@ -122,6 +124,7 @@ CAMLprim value stub_gnttab_mapv_batched(value xgh, value array, value writable)
 CAMLprim value
 stub_gnttab_fini(value unit)
 {
+    printk("WARNING: stub_gnttab_fini not implemented\n");
 #if 0
     unmap_grant_table();
 #endif
@@ -138,19 +141,13 @@ stub_gnttab_init(value unit)
 CAMLprim value
 stub_gnttab_reserved(value unit)
 {
-#if 0
     return Val_int(NR_RESERVED_ENTRIES);
-#endif
-    return Val_int(-1);
 }
 
 CAMLprim value
 stub_gnttab_nr_entries(value unit)
 {
-#if 0
     return Val_int(NR_GRANT_ENTRIES);
-#endif
-    return Val_int(-1);
 }
 
 /* Exporting (sharing) pages */
@@ -171,25 +168,30 @@ CAMLprim value stub_gntshr_close(value unit)
 	CAMLreturn(result);
 }
 
+static void
+gntshr_grant_access(grant_ref_t ref, void *page, int domid, int ro)
+{
+    gnttab_table[ref].frame = virt_to_mfn(page);
+    gnttab_table[ref].domid = domid;
+    wmb();
+    gnttab_table[ref].flags = GTF_permit_access | (ro * GTF_readonly);
+}
+
 CAMLprim value
 stub_gntshr_grant_access(value v_ref, value v_iopage, value v_domid, value v_writable)
 {
-#if 0
     grant_ref_t ref = Int_val(v_ref);
     void *page = base_page_of(v_iopage);
     gntshr_grant_access(ref, page, Int_val(v_domid), !Bool_val(v_writable));
-#endif
+
     return Val_unit;
 }
 
 CAMLprim value
 stub_gntshr_end_access(value v_ref)
 {
-#if 0
     grant_ref_t ref = Int_val(v_ref);
     uint16_t flags, nflags;
-
-    grant_entry_t *gnttab_table = get_grant_table();
 
     BUG_ON(ref >= NR_GRANT_ENTRIES || ref < NR_RESERVED_ENTRIES);
 
@@ -202,7 +204,6 @@ stub_gntshr_end_access(value v_ref)
     } while ((nflags = synch_cmpxchg(&gnttab_table[ref].flags, flags, 0)) !=
             flags);
 
-#endif
     return Val_unit;
 }
 

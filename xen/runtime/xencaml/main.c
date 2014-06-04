@@ -137,6 +137,17 @@ void exit(int status)
   do_exit();
 }
 
+int atoi(const char *nptr)
+{
+  return simple_strtoul(nptr, NULL, 10);
+}
+
+int open64(const char *pathname, int flags)
+{
+  printk("Attempt to open(%s)!\n", pathname);
+  return -1;
+}
+
 /* Not supported by FS yet.  */
 unsupported_function_crash(link);
 unsupported_function(int, readlink, -1);
@@ -250,7 +261,6 @@ unsupported_function_crash(alarm);
 unsupported_function_log(int, inet_pton, -1);
 unsupported_function_log(int, access, -1);
 
-unsupported_function_crash(open64);
 unsupported_function_crash(stat);
 unsupported_function_crash(lstat);
 unsupported_function_crash(unlink);
@@ -262,7 +272,6 @@ unsupported_function_crash(fcntl);
 unsupported_function_crash(read);
 unsupported_function_crash(gmtime);
 unsupported_function_crash(strtod);
-unsupported_function_crash(atoi);
 unsupported_function_crash(rename);
 unsupported_function_crash(times);
 unsupported_function_crash(strerror);
