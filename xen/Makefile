@@ -1,6 +1,6 @@
 .PHONY: all _config build install uninstall doc clean
 
-OCAML_VERSION=$(shell readlink runtime/ocaml)
+OCAML_VERSION=ocaml.4.01.0
 
 EXTRA=runtime/xencaml/libxencaml.a runtime/$(OCAML_VERSION)/libocaml.a
 
