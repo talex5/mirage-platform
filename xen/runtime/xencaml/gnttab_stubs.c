@@ -79,6 +79,8 @@ base_page_of(value v_iopage)
     /* The grant API takes page-alignted addresses. */
     struct caml_ba_array *a = (struct caml_ba_array *)Caml_ba_array_val(v_iopage);
     unsigned long page_aligned_view = (unsigned long)a->data & ~(PAGE_SIZE - 1);
+    if ((unsigned long)a->data & (PAGE_SIZE - 1))
+      caml_failwith("base_page_of: not page aligned!");
     return (void*) page_aligned_view;
 }
 
