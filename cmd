@@ -19,7 +19,7 @@ fi
 
 OCAMLBUILD=${OCAMLBUILD:-`which ocamlbuild`}
 OCAMLFIND=${OCAMLFIND:-`which ocamlfind`}
-OCAMLBUILD_FLAGS="-use-ocamlfind -classic-display -j ${njobs}"
+OCAMLBUILD_FLAGS="-use-ocamlfind -j ${njobs}"
 
 # create entries in the _config/ directory
 configure() {
