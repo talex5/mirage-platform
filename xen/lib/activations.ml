@@ -20,6 +20,12 @@ external evtchn_test_and_clear: int -> bool = "stub_evtchn_test_and_clear" "noal
 
 let _ = evtchn_init ()
 let nr_events = evtchn_nr_events ()
+
+let () =
+  Printf.printf "nr_events = %d\n" nr_events
+
+let nr_events = 10
+
 let event_cb = Array.init nr_events (fun _ -> Lwt_sequence.create ())
 
 (* The high-level interface creates one counter per event channel port.
