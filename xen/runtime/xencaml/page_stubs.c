@@ -43,7 +43,7 @@ caml_alloc_pages(value n_pages)
     caml_failwith("memalign");
   }
   /* Explicitly zero the page before returning it */
-  memset(block, 0, len);
+  //memset(block, 0, len);
 
   CAMLreturn(caml_ba_alloc_dims(CAML_BA_UINT8 | CAML_BA_C_LAYOUT | CAML_BA_MANAGED, 1, block, len));
 }
