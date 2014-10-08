@@ -55,6 +55,7 @@ let new_sleeps = ref []
 
 let sleep d =
   let (res, w) = Lwt.task () in
+  Profile.label ~thread:res "sleep";
   let t = if d <= 0. then 0. else Clock.time () +. d in
   let sleeper = { time = t; canceled = false; thread = w } in
   new_sleeps := sleeper :: !new_sleeps;

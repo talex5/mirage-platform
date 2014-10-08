@@ -68,7 +68,9 @@ let run t =
             |None -> Clock.time () +. 86400.0 (* one day = 24 * 60 * 60 s *)
             |Some tm -> tm
           in
+          Profile.note_suspend ();
           block_domain timeout;
+          Profile.note_resume ();
           aux ()
         end in
   try

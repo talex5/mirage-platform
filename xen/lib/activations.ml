@@ -53,9 +53,11 @@ let dump () =
 
 let after evtchn counter =
   let port = Eventchn.to_int evtchn in
-  lwt () = while_lwt ports.(port).counter <= counter && (Eventchn.is_valid evtchn) do
+  let t = while_lwt ports.(port).counter <= counter && (Eventchn.is_valid evtchn) do
     Lwt_condition.wait ports.(port).c
   done in
+  Profile.label ~thread:t ("after-chn-" ^ string_of_int port);
+  lwt () = t in
   if Eventchn.is_valid evtchn
   then Lwt.return ports.(port).counter
   else Lwt.fail Generation.Invalid
@@ -69,6 +71,7 @@ let wait evtchn =
   if Eventchn.is_valid evtchn then begin
 	  let port = Eventchn.to_int evtchn in
 	  let th, u = Lwt.task () in
+          Profile.label ("wait-on-event-" ^ string_of_int port);
 	  let node = Lwt_sequence.add_l u event_cb.(port) in
 	  Lwt.on_cancel th (fun _ -> Lwt_sequence.remove node);
 	  th

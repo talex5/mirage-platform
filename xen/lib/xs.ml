@@ -44,7 +44,9 @@ module IO = struct
         Eventchn.unmask h evtchn;
         let c = { page; evtchn } in
         singleton_client := Some c;
-        Lwt.return c
+        let r = Lwt.return c in
+        Profile.label ~thread:r "create XenStore";
+        r
 
     let refresh () =
       match !singleton_client with
@@ -65,6 +67,7 @@ module IO = struct
         let n = Xenstore_ring.Ring.Front.unsafe_read t.page buf ofs len in
         if n = 0 then begin
           lwt event = Activations.after t.evtchn event in
+          Profile.label "Xs.read waiting";
           loop event
         end else begin
           Eventchn.notify h t.evtchn;
@@ -79,6 +82,7 @@ module IO = struct
         if n > 0 then Eventchn.notify h t.evtchn;
         if n < len then begin
           lwt event = Activations.after t.evtchn event in
+          Profile.label "Xs.write waiting";
           loop event buf (ofs + n) (len - n)
         end else return () in
       loop Activations.program_start buf ofs len
