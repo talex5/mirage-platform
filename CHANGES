@@ -1,3 +1,6 @@
+trunk (unreleased):
+* [xen] Report trace events for GC, block_domain, XenStore and event channels.
+
 2.0.0 (04-Nov-2014):
 * Remove dietlibc, libm and most of the include files, replacing them with
   external dependencies on Mini-OS and openlibm.
