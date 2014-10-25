@@ -42,7 +42,10 @@ type port = {
   c: unit Lwt_condition.t;
 }
 
-let ports = Array.init nr_events (fun _ -> { counter = program_start; c = Lwt_condition.create () })
+let ports = Array.init nr_events (fun port -> {
+  counter = program_start;
+  c = Profile.named_condition ("after-chn-" ^ string_of_int port)
+})
 
 let dump () =
   Printf.printf "Number of received event channel events:\n";
@@ -53,11 +56,9 @@ let dump () =
 
 let after evtchn counter =
   let port = Eventchn.to_int evtchn in
-  let t = while_lwt ports.(port).counter <= counter && (Eventchn.is_valid evtchn) do
+  lwt () = while_lwt ports.(port).counter <= counter && (Eventchn.is_valid evtchn) do
     Lwt_condition.wait ports.(port).c
   done in
-  Profile.label ~thread:t ("after-chn-" ^ string_of_int port);
-  lwt () = t in
   if Eventchn.is_valid evtchn
   then Lwt.return ports.(port).counter
   else Lwt.fail Generation.Invalid
