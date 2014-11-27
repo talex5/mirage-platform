@@ -3,7 +3,7 @@
 
 #include <sys/cdefs.h>
 #include <endian.h>
-#include <types.h>
+#include <sys/types.h>
 
 __BEGIN_DECLS
 
